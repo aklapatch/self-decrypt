@@ -1,0 +1,8 @@
+$(OBJDIR)/iup_cd.o: iup_cd.c ../include/iup.h ../include/iupkey.h \
+ ../include/iupdef.h ../include/iup_export.h
+$(OBJDIR)/iup_cdutil.o: iup_cdutil.c ../include/iup.h ../include/iupkey.h \
+ ../include/iupdef.h ../include/iup_export.h ../src/iup_attrib.h \
+ ../src/iup_str.h ../src/iup_drv.h ../src/iup_image.h iup_cdutil.h
+$(OBJDIR)/iup_draw_cd.o: iup_draw_cd.c ../include/iup.h ../include/iupkey.h \
+ ../include/iupdef.h ../include/iup_export.h ../include/iupdraw_cd.h \
+ ../src/iup_drvdraw.h ../src/iup_drvfont.h
