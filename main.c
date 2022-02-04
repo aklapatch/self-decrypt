@@ -6,6 +6,23 @@
 
 static char in_path[10240] = "", out_path[10240] = "";
 
+int get_in_path(Ihandle *self){
+  Ihandle *dlg = IupFileDlg();
+  IupSetAttributes(dlg, "DIALOGTYPE = OPEN, TITLE = \"File Select\"");
+  IupSetAttributes(dlg, "FILTER = \"*\", FILTERINFO = \"All Files\"");
+  IupPopup(dlg, IUP_CENTER, IUP_CENTER);
+  switch(IupGetInt(dlg, "STATUS"))
+  {
+    case 0 :
+      memset(in_path, 0, sizeof(in_path));
+      IupMessagef("New file",IupGetAttribute(dlg, "VALUE"));
+      strncpy(in_path, IupGetAttribute(dlg, "VALUE"), sizeof(in_path));
+      printf("in_path = %s\n", in_path);
+      break;
+  }
+  return IUP_DEFAULT;
+}
+
 int get_out_path(Ihandle *self){
   Ihandle *dlg = IupFileDlg();
   IupSetAttributes(dlg, "DIALOGTYPE = SAVE, TITLE = \"Archive Save\"");
@@ -23,11 +40,6 @@ int get_out_path(Ihandle *self){
     case 0 :
       IupMessage("File already exists",IupGetAttribute(dlg, "VALUE"));
       break;
-
-    case -1 :
-      IupMessage("IupFileDlg","Operation Canceled");
-      return 1;
-      break;
   }
   return IUP_DEFAULT;
 }
@@ -39,7 +51,6 @@ int main(int argc, char **argv)
   IupSetLanguage("ENGLISH");
   IupSetGlobal("UTF8MODE", "Yes");
 
-
   Ihandle *f_in_text = IupText(NULL), 
 	  *in_button = IupButton("Browse", "btn_f_in"),
 	  *f_out_text = IupText(NULL),
@@ -47,6 +58,8 @@ int main(int argc, char **argv)
 	  *next_button = IupButton("Next", "btn_next");
 
   IupSetCallback( out_button, "ACTION", (Icallback)get_out_path);
+
+  IupSetCallback( in_button, "ACTION", (Icallback)get_in_path);
   
   IupSetAttribute(f_in_text, "READONLY", "YES");
   IupSetAttribute(f_out_text, "READONLY", "YES");
