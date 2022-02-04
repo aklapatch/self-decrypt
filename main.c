@@ -6,18 +6,20 @@
 
 static char in_path[10240] = "", out_path[10240] = "";
 
+static Ihandle *f_in_text = NULL, *f_out_text = NULL; 
+
 int get_in_path(Ihandle *self){
   Ihandle *dlg = IupFileDlg();
   IupSetAttributes(dlg, "DIALOGTYPE = OPEN, TITLE = \"File Select\"");
   IupSetAttributes(dlg, "FILTER = \"*\", FILTERINFO = \"All Files\"");
   IupPopup(dlg, IUP_CENTER, IUP_CENTER);
-  switch(IupGetInt(dlg, "STATUS"))
+  int ret = IupGetInt(dlg, "STATUS");
+  switch (ret)
   {
     case 0 :
       memset(in_path, 0, sizeof(in_path));
-      IupMessagef("New file",IupGetAttribute(dlg, "VALUE"));
       strncpy(in_path, IupGetAttribute(dlg, "VALUE"), sizeof(in_path));
-      printf("in_path = %s\n", in_path);
+      IupSetAttribute(f_in_text, "VALUE", in_path);
       break;
   }
   return IUP_DEFAULT;
@@ -31,14 +33,11 @@ int get_out_path(Ihandle *self){
   switch(IupGetInt(dlg, "STATUS"))
   {
     case 1:
-      memset(out_path, 0, sizeof(out_path));
-      IupMessage("New file",IupGetAttribute(dlg, "VALUE"));
+    case 0:
       strncpy(out_path, IupGetAttribute(dlg, "VALUE"), sizeof(out_path));
-      printf("out_file = %s\n", out_path);
-      break;
-
-    case 0 :
-      IupMessage("File already exists",IupGetAttribute(dlg, "VALUE"));
+      IupSetAttribute(f_out_text, "VALUE", out_path);
+      IupSetAttributes(f_out_text, "READONLY = YES, EXPAND = YES, SIZE = 4x8");
+      IupRefresh(f_out_text);
       break;
   }
   return IUP_DEFAULT;
@@ -51,26 +50,33 @@ int main(int argc, char **argv)
   IupSetLanguage("ENGLISH");
   IupSetGlobal("UTF8MODE", "Yes");
 
-  Ihandle *f_in_text = IupText(NULL), 
-	  *in_button = IupButton("Browse", "btn_f_in"),
-	  *f_out_text = IupText(NULL),
+  f_in_text = IupText(NULL);
+  f_out_text = IupText(NULL);
+  Ihandle *in_button = IupButton("Browse", "btn_f_in"),
 	  *out_button = IupButton("Browse", "btn_f_out"),
-	  *next_button = IupButton("Next", "btn_next");
+	  *next_button = IupButton("Next", "btn_next"),
+	  *in_label = IupLabel("Input File"),
+	  *out_label = IupLabel("Output File");
 
+  IupSetAttributes(in_label, "PADDING = 3x3");
+  IupSetAttributes(out_label, "PADDING = 3x3");
   IupSetCallback( out_button, "ACTION", (Icallback)get_out_path);
 
   IupSetCallback( in_button, "ACTION", (Icallback)get_in_path);
   
-  IupSetAttribute(f_in_text, "READONLY", "YES");
+  IupSetAttributes(f_in_text, "READONLY = YES, EXPAND = YES, SIZE = 4x8");
   IupSetAttribute(f_out_text, "READONLY", "YES");
+  IupSetAttribute(f_out_text, "EXPAND", "YES");
 
   Ihandle *dlg = IupDialog(
 	      IupVbox(
 		IupHbox(
+		  in_label,
 		  f_in_text,
 		  in_button,
 		  NULL),
 		IupHbox(
+		  out_label,
 		  f_out_text,
 		  out_button,
 		  NULL),
@@ -86,8 +92,5 @@ int main(int argc, char **argv)
   IupClose();
 
   /* Program finished successfully */
-  return EXIT_SUCCESS;
-
-  IupClose();
   return EXIT_SUCCESS;
 }
