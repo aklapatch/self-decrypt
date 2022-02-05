@@ -45,14 +45,20 @@ int get_in_path(Ihandle *self){
 int get_out_path(Ihandle *self){
   Ihandle *dlg = IupFileDlg();
   IupSetAttributes(dlg, "DIALOGTYPE = SAVE, TITLE = \"Archive Save\"");
-  IupSetAttributes(dlg, "FILTER = \"*.exe\", FILTERINFO = \"Executable Files\"");
+  IupSetAttributes(dlg, "FILTER = \"*.exe\", FILTERINFO = \".exe Files\"");
   IupPopup(dlg, IUP_CENTER, IUP_CENTER);
   switch(IupGetInt(dlg, "STATUS"))
   {
     case 1:
     case 0:
-      memset(in_path, 0, sizeof(in_path));
+      memset(out_path, 0, sizeof(out_path));
       strncpy(out_path, IupGetAttribute(dlg, "VALUE"), sizeof(out_path));
+      // append .exe if it's not there
+      const char exe[] = ".exe";
+      size_t pth_len = strlen(out_path), exe_len = strlen(exe);
+      if (strncmp(out_path + pth_len - exe_len, exe, exe_len) != 0){
+	strncat(out_path, exe, sizeof(out_path) - exe_len);
+      }
       IupSetAttribute(f_out_text, "VALUE", out_path);
       has_out_path = true;
       break;
@@ -101,11 +107,9 @@ int encrypt_archive_cb(Ihandle *self){
   pwd[sizeof(pwd)  -1] = '\0';
   size_t pwd_len = strlen(pwd);
   
-  uint8_t hash[48] = {0};
+  uint8_t hash[crypto_box_SEEDBYTES] = {0};
   // use a bad salt (It needs to be predictable so it can be verified).
-  char salty[42] = {0};
-  memset(salty, '3', sizeof(salty) - 1);
-  size_t hash_len = sizeof(hash);
+  const char salty[] = "A terrible, no good, very bad salt";
   // hash with no salt.
   int hash_rc = crypto_pwhash(hash, sizeof(hash), pwd, pwd_len, salty, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
   if (hash_rc != 0){
@@ -113,20 +117,77 @@ int encrypt_archive_cb(Ihandle *self){
     return IUP_DEFAULT;
   }
 
-  // hash password for storage too
-  char hash_pwd[crypto_pwhash_STRBYTES] = {0};
-  hash_rc = crypto_pwhash_str(hash_pwd, pwd, pwd_len, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE);
+  // hash again for the nonce bytes
+  uint8_t nonce[crypto_box_NONCEBYTES] = {0};
+  hash_rc = crypto_pwhash(nonce, sizeof(nonce), pwd, pwd_len, salty, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
   if (hash_rc != 0){
-    IupMessagef("Error", "Failed to hash password for storage rc=%d", hash_rc);
+    IupMessagef("Error", "Failed to hash password rc=%d", hash_rc);
     return IUP_DEFAULT;
   }
-  char hex_hash[sizeof(hash)*2 + 1], storage_hash[crypto_pwhash_STRBYTES*2 + 1];
-  to_hex(hash, sizeof(hash), hex_hash, sizeof(hex_hash));
-  to_hex(hash_pwd, sizeof(hash_pwd), storage_hash, sizeof(storage_hash));
-  IupMessagef("Password hash", "hash=%s\nstorage hash= %s", hex_hash, storage_hash);
 
-  // gerneate public and secret keys from the password hash
-  //int rc = crypto_box_seed_keypair(
+  // generate public and secret keys from the password hash
+  uint8_t sk[crypto_box_SECRETKEYBYTES] = {0}, pk[crypto_box_PUBLICKEYBYTES ] = {0};
+  int rc = crypto_box_seed_keypair(pk, sk, hash);
+  if (rc != 0){
+    IupMessagef("Error", "Failed to Generate key pair! rc=%d", rc);
+    return IUP_DEFAULT;
+  }
+
+  // pre-generate key to encrypt the file.
+  uint8_t result_k[crypto_box_BEFORENMBYTES] = {0};
+  rc = crypto_box_beforenm(result_k, pk, sk);
+  if (rc != 0){
+    IupMessagef("Error", "Failed to pre-compute key! rc=%d", rc);
+    return IUP_DEFAULT;
+  }
+
+  // TODO: prepend the extractor program
+  // read the file and encrypt it, dump it to the output file.
+  uint8_t file_buf[8*1024] = {0};
+
+  // grab the first file and write it to the output file first.
+  FILE *fout = fopen(out_path, "wb");
+  if (fout == NULL){
+    IupMessagef("Error", "Opening %s failed!", out_path);
+    return IUP_DEFAULT;
+  }
+
+  FILE *fin1 = fopen(in_path, "rb");
+  if (fin1 == NULL){
+    IupMessagef("Error", "Opening %s failed!", in_path);
+    return IUP_DEFAULT;
+  }
+
+  uint64_t in1_size = 0, out_size = 0;
+  // leave space for the maclen so we can encrypt in place
+  size_t read_size = sizeof(file_buf) - crypto_box_MACBYTES;
+  for (size_t bytes_read = read_size; bytes_read == read_size;){
+    bytes_read = fread(file_buf, 1, read_size, fin1);
+    in1_size += bytes_read;
+
+    // encrypt the stuff
+    rc = crypto_box_easy_afternm(file_buf, file_buf, bytes_read, nonce, result_k);
+    if (rc != 0){
+      IupMessagef("Error", "Failed to encrypt data! rc=%d", rc);
+      goto cleanup;
+    }
+    size_t write_size = bytes_read + crypto_box_MACBYTES;
+
+    size_t bytes_out = fwrite(file_buf, 1, write_size, fout);
+    if (bytes_out != write_size){
+      IupMessagef("Error", "Failed writing to %s! Expected %u bytes, got %u!\n", out_path, write_size, bytes_out);
+      goto cleanup;
+    }
+    out_size += bytes_out;
+  }
+  IupMessagef("Success", "Success!\nRead %lu bytes from %s.\nWrote %lu bytes to %s",in1_size,  in_path, out_size, out_path);
+
+cleanup:
+  memset(result_k, 0, sizeof(result_k));
+  memset(sk, 0, sizeof(sk));
+  memset(pk, 0, sizeof(pk));
+  fclose(fin1); fclose(fout);
+
   return IUP_DEFAULT; 
 } 
 
