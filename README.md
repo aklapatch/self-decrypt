@@ -8,16 +8,9 @@ then if the password is correct, then it will extract the payload. The
 payload should be AES-256 encrypted, and verified with ECC P384 if possible.
 
 ### Crypto plans
-- Use Argon2id for password hashing.
-- Use tomcrypt for ChaCha20Poly1305 and ecc sign+verify
-
-First, ECC verify the password hash.
-The password hash will be split into a key, IV, and a MAC addition. 
-The whole password hash will also be used for authdata.
-There will be some user provided randomness (from the interval of how many times they push a ui button or something, fed into chacha20), that will be used to create an ECC private key.
-A paired public key will be made from that private key. That key pair
-will be used to sign the payload MAC. Part of the payload MAC will come
-from ChaCha20Poly1305, and the other 24 bytes will come from part of the password hash.
+- Use libsodium (MSYS2 x86_64 package version)
+- Authenticate the password before decrypting stuff.
+- Authenticate the decrypted stuff somehow (maybe ECC?)
 
 ### File Format Plans
 The self-decrypting archive format:
