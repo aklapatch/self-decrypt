@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sodium.h>
+#include "util.h"
 #include <iup.h>
 
 
@@ -104,8 +105,12 @@ int encrypt_archive_cb(Ihandle *self){
   // hash the password.
   char pwd[4096] = {0};
   strncpy(pwd, IupGetAttribute(pw_text, "VALUE"), sizeof(pwd));
-  pwd[sizeof(pwd)  -1] = '\0';
+  pwd[sizeof(pwd) - 1] = '\0';
   size_t pwd_len = strlen(pwd);
+  if (pwd_len == 0){
+    IupMessagef("Error", "Please enter a longer password.");
+    return IUP_DEFAULT;
+  }
   
   uint8_t hash[crypto_box_SEEDBYTES] = {0};
   // use a bad salt (It needs to be predictable so it can be verified).
@@ -121,7 +126,7 @@ int encrypt_archive_cb(Ihandle *self){
   uint8_t nonce[crypto_box_NONCEBYTES] = {0};
   hash_rc = crypto_pwhash(nonce, sizeof(nonce), pwd, pwd_len, salty, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
   if (hash_rc != 0){
-    IupMessagef("Error", "Failed to hash password rc=%d", hash_rc);
+    IupMessagef("Error", "Failed to hash password for nonce rc=%d", hash_rc);
     return IUP_DEFAULT;
   }
 
@@ -142,8 +147,6 @@ int encrypt_archive_cb(Ihandle *self){
   }
 
   // TODO: prepend the extractor program
-  // read the file and encrypt it, dump it to the output file.
-  uint8_t file_buf[8*1024] = {0};
 
   // grab the first file and write it to the output file first.
   FILE *fout = fopen(out_path, "wb");
@@ -159,6 +162,8 @@ int encrypt_archive_cb(Ihandle *self){
   }
 
   uint64_t in1_size = 0, out_size = 0;
+  // read the file and encrypt it, dump it to the output file.
+  uint8_t file_buf[FREAD_BYTES] = {0};
   // leave space for the maclen so we can encrypt in place
   size_t read_size = sizeof(file_buf) - crypto_box_MACBYTES;
   for (size_t bytes_read = read_size; bytes_read == read_size;){
@@ -180,7 +185,10 @@ int encrypt_archive_cb(Ihandle *self){
     }
     out_size += bytes_out;
   }
-  IupMessagef("Success", "Success!\nRead %lu bytes from %s.\nWrote %lu bytes to %s",in1_size,  in_path, out_size, out_path);
+  // write sentinel and size
+  out_size += fwrite(&out_size, 1, sizeof(out_size), fout);
+  out_size += fwrite(END_SENTINEL, 1, strlen(END_SENTINEL), fout);
+  IupMessagef("Success", "Success!\n\nRead %lu bytes from\n%s.\n\nWrote %lu bytes to\n%s",in1_size,  in_path, out_size, out_path);
 
 cleanup:
   memset(result_k, 0, sizeof(result_k));
@@ -199,7 +207,7 @@ int main(int argc, char **argv) {
   f_in_text = IupText(NULL);
   f_out_text = IupText(NULL);
   pw_text = IupText(NULL);
-  next_button = IupButton("Generate File", "next_button");
+  next_button = IupButton("Encrypt File", "next_button");
   IupSetAttributes(next_button, "ACTIVE = NO");
 
   Ihandle *in_button = IupButton("Browse", "btn_f_in"),

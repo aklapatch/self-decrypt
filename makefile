@@ -23,8 +23,14 @@ iup:
 clean:
 	rm -rf *.exe *.o iup/obj
 
-main: iup
+main: iup main.c
 	$(CC) -g main.c  -o self-decrypt $(CFLAGS) $(LIBS) 
 
 test: main
 	./self-decrypt
+
+extract: extract.c
+	$(CC) -g extract.c -o extract $(CFLAGS) $(LIBS)
+
+extract-test:
+	./extract
