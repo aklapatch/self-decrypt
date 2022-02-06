@@ -1,9 +1,10 @@
 ifeq ($(OS), Windows_NT)
-	LIBS=iup/lib/mingw4/libiup.a -Iiup/include -lgdi32 -lcomdlg32 -lcomctl32 -luuid -loleaut32 -lole32 /mingw64/lib/libsodium.a
-	CFLAGS=$(shell pkg-config --cflags libsodium)  -static
+	LIBS=iup/lib/mingw4/libiup.a -lgdi32 -lcomdlg32 -lcomctl32 -luuid -loleaut32 -lole32 $(shell pkg-config --libs libsodium)
+	CFLAGS=$(shell pkg-config --cflags libsodium) -Iiup/include -static -Os
 	ENV=MINGW4=/mingw64 TEC_UNAME=mingw4
 else
 	ENV=""
+	CFLAGS=$(shell pkg-config --cflags libsodium) -Iiup/include -static -Os
 	LIBS=iup/lib/linux510_64/libiup.a -Iiup/include/ -lgtk-3 -lgdk-3 -lglib-2.0 -lgobject-2.0 -lpango-1.0 -lpangocairo-1.0 -lcairo -lgdk_pixbuf-2.0 -lm -lx11
 endif
 

@@ -64,8 +64,23 @@ int decrypt_cb(Ihandle *handle){
 
   //TODO zero out all keys.
   uint64_t file_size = 0;
-  int64_t offset = - (int64_t)(SENTINEL_LEN  + sizeof(file_size));
+  int64_t offset = - (int64_t)(SENTINEL_LEN + 1);
   if (fseek(self, offset, SEEK_END) != 0){
+	IupMessagef("Error", "Failed to seek in %s", self_name);
+	goto closein;
+  }
+
+  // go back until you hit the null terminator, getting the name along the way.
+  char base_name[1024] = {0}, *name_ptr = base_name + sizeof(base_name) - 2;
+  size_t name_len = 0;
+  for (char c = fgetc(self); c != '\0' && name_ptr > base_name; fseek(self, -2, SEEK_CUR),c = fgetc(self), --name_ptr){
+    *name_ptr = c;
+  }
+  // correct for extra decrement.
+  ++name_ptr;
+
+  // the file is pointing right after the '\0', move it back sizeof(file_size) + 1
+  if (fseek(self, - (int64_t)(sizeof(file_size) + 1), SEEK_CUR) != 0){
 	IupMessagef("Error", "Failed to seek in %s", self_name);
 	goto closein;
   }
@@ -76,16 +91,14 @@ int decrypt_cb(Ihandle *handle){
   }
 
   //seek to the beginning of the stored file (not the .exe file)
-  offset -= file_size;
-  if (fseek(self, offset , SEEK_END) != 0){
+  if (fseek(self, - (int64_t)(file_size + sizeof(file_size)) , SEEK_CUR) != 0){
 	IupMessagef("Error", "Failed to seek in %s", self_name);
 	goto closein;
   }
   
-  const char *out_path = "decrypted.txt";
-  FILE *fout = fopen(out_path, "wb");
+  FILE *fout = fopen(name_ptr, "wb");
   if (fout == NULL){
-	IupMessagef("Error", "Failed to open output file!");
+	IupMessagef("Error", "Failed to open %s!", name_ptr);
 	goto closein;
   }
 
@@ -110,12 +123,12 @@ int decrypt_cb(Ihandle *handle){
 
     size_t bytes_out = fwrite(file_buf, 1, write_size, fout);
     if (bytes_out != write_size){
-      IupMessagef("Error", "Failed writing to %s! Expected %u bytes, got %u!\n", out_path, write_size, bytes_out);
+      IupMessagef("Error", "Failed writing to %s! Expected %u bytes, got %u!\n", name_ptr, write_size, bytes_out);
       goto closeout;
     }
     out_size += bytes_out;
   }
-  IupMessagef("Success!", "Wrote %u bytes to %s\n", out_size, out_path);
+  IupMessagef("Success!", "Wrote %u bytes to %s\n", out_size, name_ptr);
 
 closeout:
   fclose(fout);

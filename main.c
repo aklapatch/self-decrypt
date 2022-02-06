@@ -18,6 +18,17 @@ static bool has_in_path = false, has_out_path = false;
 
 static clock_t in_pick_time = 0, out_pick_time = 0, generate_time = 0;
 
+static char *file_base_name(char *str){
+  char *end = str + strlen(str);
+
+  // go backwards until you hit str or untile you hit '/' or '\\'
+  for (char *cur = end; cur > str; --cur){
+    if (*cur == '/' || *cur == '\\'){
+      return cur + 1;
+    }
+  }
+  return NULL;
+}
 void maybe_activate_next_button(){
   const char * attr = has_in_path && has_out_path ? "ACTIVE = YES" : "ACTIVE = NO";
   IupSetAttributes(next_button, attr);
@@ -197,9 +208,27 @@ int encrypt_archive_cb(Ihandle *self){
     }
     out_size += bytes_out;
   }
+
   // write sentinel and size
   out_size += fwrite(&out_size, 1, sizeof(out_size), fout);
+  //
+  // put down null terminator
+  fputc('\0', fout);
+  out_size += 1;
+
+  // write a common file prefix
+  const char prefix[] = "decrypted-";
+  fputs(prefix, fout);
+  out_size += strlen(prefix);
+
+  // write the file name out
+  char *base_name = file_base_name(in_path);
+  size_t base_name_len = strlen(base_name);
+  fputs(base_name, fout);
+  out_size += base_name_len;
+
   out_size += fwrite(END_SENTINEL, 1, strlen(END_SENTINEL), fout);
+  
   IupMessagef("Success", "Success!\n\nRead %lu bytes from\n%s.\n\nWrote %lu bytes to\n%s",in1_size,  in_path, out_size, out_path);
 
 cleanup:
@@ -212,6 +241,7 @@ cleanup:
 } 
 
 int main(int argc, char **argv) {
+
   IupOpen(&argc, &argv);
   IupSetLanguage("ENGLISH");
   IupSetGlobal("UTF8MODE", "Yes");
