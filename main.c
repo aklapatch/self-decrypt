@@ -113,10 +113,7 @@ int encrypt_archive_cb(Ihandle *self){
   }
   
   uint8_t hash[crypto_box_SEEDBYTES] = {0};
-  // use a bad salt (It needs to be predictable so it can be verified).
-  const char salty[] = "A terrible, no good, very bad salt";
-  // hash with no salt.
-  int hash_rc = crypto_pwhash(hash, sizeof(hash), pwd, pwd_len, salty, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
+  int hash_rc = crypto_pwhash(hash, sizeof(hash), pwd, pwd_len, SALT, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
   if (hash_rc != 0){
     IupMessagef("Error", "Failed to hash password rc=%d", hash_rc);
     return IUP_DEFAULT;
@@ -124,7 +121,7 @@ int encrypt_archive_cb(Ihandle *self){
 
   // hash again for the nonce bytes
   uint8_t nonce[crypto_box_NONCEBYTES] = {0};
-  hash_rc = crypto_pwhash(nonce, sizeof(nonce), pwd, pwd_len, salty, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
+  hash_rc = crypto_pwhash(nonce, sizeof(nonce), pwd, pwd_len, SALT, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
   if (hash_rc != 0){
     IupMessagef("Error", "Failed to hash password for nonce rc=%d", hash_rc);
     return IUP_DEFAULT;
@@ -141,12 +138,12 @@ int encrypt_archive_cb(Ihandle *self){
   // pre-generate key to encrypt the file.
   uint8_t result_k[crypto_box_BEFORENMBYTES] = {0};
   rc = crypto_box_beforenm(result_k, pk, sk);
+  // TODO: set pk and sk to 0 here
   if (rc != 0){
     IupMessagef("Error", "Failed to pre-compute key! rc=%d", rc);
     return IUP_DEFAULT;
   }
 
-  // TODO: prepend the extractor program
 
   // grab the first file and write it to the output file first.
   FILE *fout = fopen(out_path, "wb");
@@ -154,6 +151,22 @@ int encrypt_archive_cb(Ihandle *self){
     IupMessagef("Error", "Opening %s failed!", out_path);
     return IUP_DEFAULT;
   }
+
+  char extract_name[4096] = { "extract.exe"};
+  FILE *extractor_f = fopen(extract_name, "rb");
+  if (extractor_f == NULL){
+    IupMessagef("Error", "Opening %s failed!", extract_name);
+    return IUP_DEFAULT;
+  }
+
+  uint8_t file_buf[FREAD_BYTES] = {0};
+  size_t rd_len = sizeof(file_buf);
+  // write the extractor program to a file first.
+  for (size_t bytes_read = rd_len; bytes_read == rd_len;){
+    bytes_read = fread(file_buf, 1, rd_len, extractor_f);
+    fwrite(file_buf, 1, bytes_read, fout);
+  }
+  fclose(extractor_f);
 
   FILE *fin1 = fopen(in_path, "rb");
   if (fin1 == NULL){
@@ -163,7 +176,6 @@ int encrypt_archive_cb(Ihandle *self){
 
   uint64_t in1_size = 0, out_size = 0;
   // read the file and encrypt it, dump it to the output file.
-  uint8_t file_buf[FREAD_BYTES] = {0};
   // leave space for the maclen so we can encrypt in place
   size_t read_size = sizeof(file_buf) - crypto_box_MACBYTES;
   for (size_t bytes_read = read_size; bytes_read == read_size;){

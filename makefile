@@ -1,6 +1,6 @@
 ifeq ($(OS), Windows_NT)
-	LIBS=iup/lib/mingw4/libiup.a -Iiup/include -lgdi32 -lcomdlg32 -lcomctl32 -luuid -loleaut32 -lole32 $(shell pkg-config --libs libsodium)
-	CFLAGS=$(shell pkg-config --cflags libsodium) 
+	LIBS=iup/lib/mingw4/libiup.a -Iiup/include -lgdi32 -lcomdlg32 -lcomctl32 -luuid -loleaut32 -lole32 /mingw64/lib/libsodium.a
+	CFLAGS=$(shell pkg-config --cflags libsodium)  -static
 	ENV=MINGW4=/mingw64 TEC_UNAME=mingw4
 else
 	ENV=""
@@ -23,7 +23,7 @@ iup:
 clean:
 	rm -rf *.exe *.o iup/obj
 
-main: iup main.c
+main: iup extract main.c
 	$(CC) -g main.c  -o self-decrypt $(CFLAGS) $(LIBS) 
 
 test: main
@@ -32,5 +32,5 @@ test: main
 extract: extract.c
 	$(CC) -g extract.c -o extract $(CFLAGS) $(LIBS)
 
-extract-test:
+extract-test: extract
 	./extract
