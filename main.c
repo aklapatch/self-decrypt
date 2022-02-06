@@ -56,7 +56,7 @@ int get_in_path(Ihandle *self){
 
 int get_out_path(Ihandle *self){
   Ihandle *dlg = IupFileDlg();
-  IupSetAttributes(dlg, "DIALOGTYPE = SAVE, TITLE = \"Archive Save\"");
+  IupSetAttributes(dlg, "DIALOGTYPE = SAVE, TITLE = \"File Select\"");
   IupSetAttributes(dlg, "FILTER = \"*.exe\", FILTERINFO = \".exe Files\"");
   IupPopup(dlg, IUP_CENTER, IUP_CENTER);
   switch(IupGetInt(dlg, "STATUS"))
