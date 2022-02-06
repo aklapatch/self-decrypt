@@ -102,7 +102,7 @@ int decrypt_cb(Ihandle *handle){
     // encrypt the stuff
     rc = crypto_box_open_easy_afternm(file_buf, file_buf, bytes_read, nonce, result_k);
     if (rc != 0){
-      IupMessagef("Error", "Failed to decrypt (or authenticate) data! rc=%d", rc);
+      IupMessagef("Error", "Failed to decrypt (or authenticate) the file! Is the password correct?");
       goto closeout;
     }
     // remove the size of the MAC
