@@ -11,7 +11,7 @@
 
 static char in_path[10240] = "", out_path[10240] = "";
 
-static Ihandle *f_in_text = NULL, *f_out_text = NULL, *pw_text = NULL, *next_button = NULL; 
+static Ihandle *f_in_text = NULL, *f_out_text = NULL, *pw_text = NULL, *pw_text2 = NULL, *next_button = NULL; 
 
 static bool has_in_path = false, has_out_path = false;
 
@@ -121,6 +121,12 @@ int encrypt_archive_cb(Ihandle *self){
     IupMessagef("Error", "Please enter a longer password.");
     return IUP_DEFAULT;
   }
+
+  // error if the passwords don't match
+  if (strncmp(pwd, IupGetAttribute(pw_text2, "VALUE"), strlen(pwd)) != 0){
+    IupMessagef("Error", "Passwords do not match!");
+    return IUP_DEFAULT;
+  }
   
   uint8_t hash[crypto_box_SEEDBYTES] = {0};
   int hash_rc = crypto_pwhash(hash, sizeof(hash), pwd, pwd_len, SALT, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE, crypto_pwhash_ALG_DEFAULT);
@@ -228,13 +234,21 @@ int encrypt_archive_cb(Ihandle *self){
 
   out_size += fwrite(END_SENTINEL, 1, strlen(END_SENTINEL), fout);
   
+  fclose(fin1); fclose(fout);
+  fin1 = NULL, fout= NULL;
+
   IupMessagef("Success", "Success!\n\nRead %lu bytes from\n%s.\n\nWrote %lu bytes to\n%s",in1_size,  in_path, out_size, out_path);
 
 cleanup:
   memset(result_k, 0, sizeof(result_k));
   memset(sk, 0, sizeof(sk));
   memset(pk, 0, sizeof(pk));
-  fclose(fin1); fclose(fout);
+  if (fin1 != NULL){
+    fclose(fin1);
+  }
+  if (fout != NULL){
+    fclose(fout);
+  }
 
   return IUP_DEFAULT; 
 } 
@@ -248,6 +262,7 @@ int main(int argc, char **argv) {
   f_in_text = IupText(NULL);
   f_out_text = IupText(NULL);
   pw_text = IupText(NULL);
+  pw_text2 = IupText(NULL);
   next_button = IupButton("Encrypt File", "next_button");
   IupSetAttributes(next_button, "ACTIVE = NO");
 
@@ -255,7 +270,8 @@ int main(int argc, char **argv) {
 	  *out_button = IupButton("Browse", "btn_f_out"),
 	  *in_label = IupLabel(" Input File: "),
 	  *out_label = IupLabel(" Output File:"),
-	  *pw_label = IupLabel(" Password:");
+	  *pw_label = IupLabel(" Password:"),
+	  *pw_label2 = IupLabel("Confirm Password:");
 
   IupSetAttributes(in_label, "PADDING = 5x5, SIZE = 60x8");
   IupSetAttributes(out_label, "PADDING = 5x5, SIZE = 60x8");
@@ -271,6 +287,7 @@ int main(int argc, char **argv) {
   IupSetAttributes(f_out_text, "READONLY = YES, EXPAND = HORIZONTAL, PADDING = 10x10");
   IupSetAttributes(f_out_text, "VALUE = \"Use this Browse Button to select an output file. ->\"");
   IupSetAttributes(pw_text, "PASSWORD = YES, EXPAND = HORIZONTAL, PADDING = 10x10");
+  IupSetAttributes(pw_text2, "PASSWORD = YES, EXPAND = HORIZONTAL, PADDING = 10x10");
 
   Ihandle *dlg = IupDialog(
 	      IupVbox(
@@ -287,6 +304,12 @@ int main(int argc, char **argv) {
 		IupHbox(
 		  pw_label,
 		  pw_text,
+		  NULL),
+		IupHbox(
+		  pw_label2,
+		  pw_text2,
+		  NULL),
+		IupHbox(
 		  next_button,
 		  NULL),
 		NULL
