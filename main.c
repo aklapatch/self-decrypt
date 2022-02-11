@@ -9,7 +9,7 @@
 #include "util.h"
 #include <iup.h>
 
-static char in_path[10240] = "", out_path[10240] = "";
+static char in_path[4096] = "", out_path[4096] = "", self_path[4096] = "";
 
 static Ihandle *f_in_text = NULL, *f_out_text = NULL, *pw_text = NULL, *pw_text2 = NULL, *next_button = NULL; 
 
@@ -146,6 +146,7 @@ int encrypt_archive_cb(Ihandle *self){
   // generate public and secret keys from the password hash
   uint8_t sk[crypto_box_SECRETKEYBYTES] = {0}, pk[crypto_box_PUBLICKEYBYTES ] = {0};
   int rc = crypto_box_seed_keypair(pk, sk, hash);
+  memset(hash, 0, sizeof(hash));
   if (rc != 0){
     IupMessagef("Error", "Failed to Generate key pair! rc=%d", rc);
     return IUP_DEFAULT;
@@ -161,29 +162,64 @@ int encrypt_archive_cb(Ihandle *self){
     return IUP_DEFAULT;
   }
 
-
-  // grab the first file and write it to the output file first.
+  // grab the extractor program and write it to a file first.
   FILE *fout = fopen(out_path, "wb");
   if (fout == NULL){
     IupMessagef("Error", "Opening %s failed!", out_path);
     return IUP_DEFAULT;
   }
 
-  char extract_name[4096] = { "extract.exe"};
-  FILE *extractor_f = fopen(extract_name, "rb");
+  FILE *extractor_f = fopen(self_path, "rb");
   if (extractor_f == NULL){
-    IupMessagef("Error", "Opening %s failed!", extract_name);
+    IupMessagef("Error", "Opening %s failed!", self_path);
     return IUP_DEFAULT;
+  }
+
+  // see if there's a file sentinel
+  if (fseek(extractor_f, - SENTINEL_LEN, SEEK_END) != 0){
+	IupMessagef("Error", "Failed to get to the end of %s", self_path);
+	goto cleanup;
+  }
+
+  char sentinel[SENTINEL_LEN + 1] = {0};
+  size_t b_read = fread(sentinel, 1, SENTINEL_LEN, extractor_f);
+  if (b_read != SENTINEL_LEN){
+	IupMessagef("Error", "Failed to read %s", self_path);
+	goto cleanup;
+  }
+
+  if (strncmp(sentinel, END_SENTINEL, SENTINEL_LEN) != 0){
+	IupMessagef("Error", "File sentinel not found in %s\nIs extractor attached?", self_path);
+	goto cleanup;
+  }
+  
+  // read file size
+  uint64_t file_size = 0;
+  if (fseek(extractor_f, - (int64_t)(sizeof(file_size)  + SENTINEL_LEN), SEEK_END) != 0){
+	IupMessagef("Error", "Failed to seek in %s", self_path);
+	goto cleanup;
+  }
+
+  if (fread(&file_size, 1, sizeof(file_size), extractor_f) != sizeof(file_size)){
+	IupMessagef("Error", "Failed to read %s", self_path);
+	goto cleanup;
+  }
+
+  // go to the beginning of the extractor file
+  if (fseek(extractor_f, - (int64_t)(file_size + sizeof(file_size) + SENTINEL_LEN), SEEK_END) != 0){
+	IupMessagef("Error", "Failed to seek in %s", self_path);
+	goto cleanup;
   }
 
   uint8_t file_buf[FREAD_BYTES] = {0};
   size_t rd_len = sizeof(file_buf);
   // write the extractor program to a file first.
-  for (size_t bytes_read = rd_len; bytes_read == rd_len;){
+  for (size_t bytes_read = rd_len; bytes_read == rd_len && file_size > 0; file_size -= rd_len){
     bytes_read = fread(file_buf, 1, rd_len, extractor_f);
     fwrite(file_buf, 1, bytes_read, fout);
   }
   fclose(extractor_f);
+  extractor_f = NULL;
 
   FILE *fin1 = fopen(in_path, "rb");
   if (fin1 == NULL){
@@ -248,6 +284,9 @@ cleanup:
   if (fout != NULL){
     fclose(fout);
   }
+  if (extractor_f != NULL){
+    fclose(extractor_f);
+  }
 
   return IUP_DEFAULT; 
 } 
@@ -257,6 +296,9 @@ int main(int argc, char **argv) {
   IupOpen(&argc, &argv);
   IupSetLanguage("ENGLISH");
   IupSetGlobal("UTF8MODE", "Yes");
+
+  strncpy(self_path, argv[0], sizeof(self_path));
+  self_path[sizeof(self_path) - 1] = '\0';
 
   f_in_text = IupText(NULL);
   f_out_text = IupText(NULL);

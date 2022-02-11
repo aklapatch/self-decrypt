@@ -2,6 +2,7 @@
 #include<string.h>
 #include<stddef.h>
 #include<sodium.h>
+#include<stdbool.h>
 #include <iup.h>
 #include "util.h"
 
@@ -10,6 +11,8 @@ static Ihandle *pw_text= NULL, *decrypt_button = NULL;
 static char self_name[4096] = {0};
 
 int decrypt_cb(Ihandle *handle){
+
+  bool close = false;
   
   // hash the password.
   char pwd[4096] = {0};
@@ -49,7 +52,8 @@ int decrypt_cb(Ihandle *handle){
   // pre-generate key to encrypt the file.
   uint8_t result_k[crypto_box_BEFORENMBYTES] = {0};
   rc = crypto_box_beforenm(result_k, pk, sk);
-  // TODO: set pk and sk to 0 here
+  memset(sk, 0, sizeof(sk));
+  memset(pk, 0, sizeof(pk));
   if (rc != 0){
     IupMessagef("Error", "Failed to pre-compute key! rc=%d", rc);
     return IUP_DEFAULT;
@@ -129,13 +133,14 @@ int decrypt_cb(Ihandle *handle){
     out_size += bytes_out;
   }
   IupMessagef("Success!", "Wrote %u bytes to %s\n", out_size, name_ptr);
+  close = true;
 
 closeout:
   fclose(fout);
 
 closein:
   fclose(self);
-  return IUP_DEFAULT;
+  return close ? IUP_CLOSE: IUP_DEFAULT;
 }
 
 int main(int argc, char **argv){
