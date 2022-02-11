@@ -9,7 +9,6 @@
 #include "util.h"
 #include <iup.h>
 
-
 static char in_path[10240] = "", out_path[10240] = "";
 
 static Ihandle *f_in_text = NULL, *f_out_text = NULL, *pw_text = NULL, *next_button = NULL; 
