@@ -154,7 +154,8 @@ int encrypt_archive_cb(Ihandle *self){
   // pre-generate key to encrypt the file.
   uint8_t result_k[crypto_box_BEFORENMBYTES] = {0};
   rc = crypto_box_beforenm(result_k, pk, sk);
-  // TODO: set pk and sk to 0 here
+  memset(sk, 0, sizeof(sk));
+  memset(pk, 0, sizeof(pk));
   if (rc != 0){
     IupMessagef("Error", "Failed to pre-compute key! rc=%d", rc);
     return IUP_DEFAULT;
@@ -241,8 +242,6 @@ int encrypt_archive_cb(Ihandle *self){
 
 cleanup:
   memset(result_k, 0, sizeof(result_k));
-  memset(sk, 0, sizeof(sk));
-  memset(pk, 0, sizeof(pk));
   if (fin1 != NULL){
     fclose(fin1);
   }
