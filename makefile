@@ -3,11 +3,13 @@ ifeq ($(OS), Windows_NT)
 	CFLAGS=$(shell pkg-config --cflags libsodium) -Iiup/include -static -Os
 	ENV=MINGW4=/mingw64 TEC_UNAME=mingw4
 else
-	echo "Platform not tested!"
-	ENV=""
-	CFLAGS=$(shell pkg-config --cflags libsodium) -Iiup/include -static -Os
-	LIBS=iup/lib/linux510_64/libiup.a -Iiup/include/ -lgtk-3 -lgdk-3 -lglib-2.0 -lgobject-2.0 -lpango-1.0 -lpangocairo-1.0 -lcairo -lgdk_pixbuf-2.0 -lm -lx11
+	echo "Platform not supported!"
+	exit 1
 endif
+
+main: iup extract main.c concat
+	$(CC) main.c  -o tmp_main $(CFLAGS) $(LIBS) 
+	./concat tmp_main.exe extract.exe self-decrypt.exe
 
 concat: concat.c
 	$(CC) -Wall -Werror concat.c -o concat
@@ -24,10 +26,6 @@ iup:
 .PHONY: clean
 clean:
 	rm -rf *.exe *.o iup/obj
-
-main: iup extract main.c concat
-	$(CC) main.c  -o tmp_main $(CFLAGS) $(LIBS) 
-	./concat tmp_main.exe extract.exe self-decrypt.exe
 
 test: main
 	./self-decrypt

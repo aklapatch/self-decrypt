@@ -38,15 +38,17 @@ $wshell.SendKeys('{TAB}')
 $wshell.SendKeys('{TAB}')
 $wshell.SendKeys('{TAB}')
 $wshell.SendKeys('{TAB}')
-# enter a password
+# enter a password twice
+$wshell.SendKeys('{TAB}')
+$wshell.SendKeys('j')
 $wshell.SendKeys('{TAB}')
 $wshell.SendKeys('j')
 
 $wshell.SendKeys('{TAB}')
 $wshell.SendKeys('{ENTER}')
 
+Sleep 1
 # should get success message, hit okay on that
-$wshell.SendKeys("{ENTER}")
-$fshell = New-Object -ComObject wscript.shell;
+$fshell = New-Object -ComObject wscript.shell
 $fshell.AppActivate("Success")
 $fshell.SendKeys('{ENTER}')

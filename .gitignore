@@ -1,5 +1,6 @@
 *.o
 *.a
+*.lo
 *.so
 *.exe
 tags

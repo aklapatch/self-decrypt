@@ -290,7 +290,6 @@ cleanup:
 
   return IUP_DEFAULT; 
 } 
-
 int main(int argc, char **argv) {
 
   IupOpen(&argc, &argv);

@@ -1,31 +1,34 @@
 # self-decrypt
 Hopefully this will be a program that makes self-decrypting archives
 
-## General idea
-I want to be able to send an encrypted payload that is password
-protected. The program should prompt for a password when cliced on, and
-then if the password is correct, then it will extract the payload. The
-payload should be AES-256 encrypted, and verified with ECC P384 if possible.
+## Buiding
+1. Install [MSYS2](https://www.msys2.org/)
+2. Open the MSYS2 MINGW64 shell
+3. Install these libraries (gcc and libsodium, and make)
+```
+pacman -S make mingw-w64-x86_64-gcc mingw-w64-x86_64-libsodium
 
-### Crypto plans
-- Use libsodium (MSYS2 x86_64 package version)
-- Authenticate the password before decrypting stuff.
-- Authenticate the decrypted stuff somehow (maybe ECC?)
+```
+4. Clone this repo
+```
+git clone --depth=1 https://github.com/aklapatch/self-decrypt
+```
+5. Build everything (The IUP toolkit is included in the repo. that will get built too).
+```
+cd self-decrypt && make
+```
+The `self-decrypt.exe` executable should be in repo's root directory when the build is finished.
 
-### File Format Plans
+## File Format Plans
 The self-decrypting archive format:
 ```
 | decryption program |
 |--------------------|
 | encrypted payload  |
 |--------------------|
-| Payload signature  |
-|--------------------|
-| password signature |
-|--------------------|
-| ECC P384 Pub key   |
-|--------------------|
 | payload length u64 |
+|--------------------|
+| payload name       |
 |--------------------|
 | sentinel value     |
 ```
@@ -43,4 +46,4 @@ The encrypting program format:
 | sentinel value               |
 ```
 The encryption program will append the encrypted payload to the
-decryption program.
+decryption program and set up the payload name and sentinel.
